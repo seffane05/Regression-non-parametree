@@ -1,0 +1,209 @@
+---
+title: "Regression non paramétré"
+author: "SEFFANE Asmaa"
+date: "2023-02-20"
+output:
+  word_document: default
+  html_document: default
+---
+
+On dispose de donnees (xi, yi)1≤i≤5000 o`u les xi et les yi sont les realisations de variables al´eatoires r´eelles (Xi, Yi)1≤i≤5000 admettant la representation
+                   Yi = r(Xi) + ξi    , i = 1, . . . 5000,
+ou:
+—les ξi sont independantes et identiquement distribu´ees, E[ξ1] = 0 et E[(ξ^2)1]= σ
+— les Xi sont independantes et identiquement distribuees de densite g, et
+independantes des ξi
+
+Ce projet porte sur l’etude de la densite g et la fonction de regression r.
+```{r}
+library(reader)
+library(stats)
+data <- read.table("Data.txt", header = T)
+```
+
+
+je dessine les histogrammes des X et des Y
+```{r, echo=FALSE}
+hist(data$X, breaks = 45, freq = FALSE)
+hist(data$Y, breaks = 45, freq = FALSE)
+```
+
+Je rappelle que l'estimateur de la densité s'écrit sous la forme:
+
+$$
+\hat{f}_{n,h}(x)= \frac{1}{nh} \sum_{i=1}^{n}K(\frac{x_{i}-x}{h})
+$$
+avec K est une application dans R integrable tel que:
+$$ \int K(x)dx = 1 $$ 
+et 0 < h est appelé fenêtre, c'est un parametre dit de lissage.
+Maintenant on va definir  differents estimateurs de la densité g(X) avec differentes fenetres de lissage h.
+les arguments utilisés dans la fonction en Rstudio sont:
+ kernel: le noyaux, on sait que le choix de noyaux a un influence negligeable quand h est bien choisit, donc je vais utiliser dans la suite le noyaux Gaussien:
+ bw: exprime la fenetres, j'en ai choisit plusieur:
+   bw.nrd est celle de bendwidth.
+   "nrd0" est par defaut de R
+   dpill est  en plugging
+   bw.ucv calculé en utilisant la cross validation 
+   methode 
+   le reste sont  differentes valeures numeriques.
+
+
+```{r}
+d1 = density(data$X, bw = bw.nrd(data$X) , kernel = "gaussian")
+
+d = density(data$X, bw = "nrd0", kernel = "gaussian")
+
+d2 = density(data$X, bw = dpill(data$X, data$Y), kernel = "gaussian")
+
+d3 = density(data$X, bw = bw.ucv(x = data$X) , kernel = "gaussian")
+
+d4 = density(data$X, bw = 0.05, kernel = "gaussian")
+
+d5 = density(data$X, bw = 0.01, kernel = "gaussian")
+
+d6 = density(data$X, bw = 0.5, kernel = "gaussian")
+```
+
+je dessine tous les estimateurs de g(X) en meme graphe sur l'histograme des X
+
+
+```{r , echo=FALSE}
+
+hist(data$X, breaks = 45, freq = FALSE, ylim=c(0,0.4))
+lines(d)
+lines(d1, col="green")
+lines(d2, col="pink")
+lines(d3, col="red")
+lines(d4, col="yellow")
+lines(d5, col="grey")
+lines(d6, col = "blue")
+
+```
+
+je remarque que le choix de h a vraiment un grand effet sur la densité g(x), 
+la densité d5, avec h = 0.05, n'est pas stable, on apercu une grande variance.
+les densité d1, avec  h est de bandwith, d, h est donné par defaut de R, et d6, avec h = 0.5, sont toutes bonne au milieu mais n'attenit pas les valeur en extrimité.
+la densité d2, avec h calculé en plugging, d3 , avec h calculé en creuse validation, et d4, avec h=0.05, sont les plus proche.
+Donc on peut choisir la valeur de parametre de lissage parmis ces trois, on peut choisir une parmis eux pour l'utilisé dans tout notre projet. 
+
+
+```{r pressure, echo=FALSE}
+x <- data$X
+y <- data$Y
+plot(x, y)
+```
+
+il est claire du graphe  que la relation entre X et Y n'est pas linéaire, et en plus on a pas une loi exacte pour le couple (X,Y).
+donc pour 
+$$
+\ Y = r(X_{i}) + \xi_{i} , i = 1,...5000
+$$
+on cherche à estimer la fonction de regression r.
+ -estimateur de naradaya whatson s'écrit sous la forme:
+$$
+\hat{r}_{n,h}(x)=\frac{\sum_{i=1}^{n}Y_{i} K(\frac{x_{i}-x}{h})}{\sum_{i=1}^{n}K(\frac{x-x_{i}}{h})}    1(\sum K(\frac{x_{i}-x}{h})\neq 0)
+$$
+ avec K un noyau d'ordre 1.
+ on calcule differents estimateur de la regression r(x) par r:
+
+```{r}
+library(np)
+library( KernSmooth)
+h= dpill(data$X, data$Y)
+fit <- locpoly(data$X, data$Y, bandwidth = h)
+
+```
+
+  hdpill: Utilise la méthodologie de plug-in direct pour sélectionner la bande passante d'une estimation de régression de noyau gaussien linéaire local, et  c'est la fenetre de lissage qu'on va utilisé dans la suite.
+  locpoly: estime la fonction de regression en utilisant les polynomes locaux. 
+  
+je dessine le graphe de tout l'estimateur de la regression choisit puis on remarque:
+```{r}
+plot(x, y)
+lines(fit1, col="red")
+
+```
+quand on dessine l'estimateur de la fonction de regression, on remarque que le h choisit construit par pluggin est parfait, et que l'estimateur choisit represente bien la fonction .
+
+essayons un autre estimateur de la fonction de regression, Nadaraya watson, la fonction ce dessous nous permet de calculer les valeur en utilisant cette merhode:
+
+```{r}
+R = function(x, X, Y, h, K = dnorm) {
+Kx <- function(y){1/h*K(y,0,1)}
+W <- mean(Kx(x-X)*Y)/mean(Kx(x-X))
+return(W%*%Y)
+ }
+```
+un petit test:
+```{r}
+R(min(data$X),data$X, data$Y, h, dnorm)
+R(max(data$X),data$X,data$Y,h,dnorm)
+```
+notre fonction fonctionne bien et les valeur sont correcte, maintenant je vais l'appliquer sur toute notre donnée puis on verra si c'est un bon estimateur ou pas:
+```{r}
+RX = function(x){
+  y = R(x,data$X, data$Y, h, dnorm)
+  return(y)
+}
+
+grid = seq(min(data$X), max(data$X), length.out = 100)
+gridY = lapply(grid, RX)
+
+grid_x = array(grid, c(100, 1))
+grid_y = array(gridY, c(100, 1))
+
+grid_xy <- data.frame(
+  grid_x = array(grid, c(100, 1)),
+  grid_y = array(gridY, c(100, 1)) 
+)
+
+
+plot(data$X, data$Y)
+lines(grid_xy, col = "red")
+```
+On voit bien qu'il y a une correspondance au voisinage de 2, mais en general c'est bien, maintenant on va ajouté l'estimateur de nadaraya watson calculé par R et on verra:
+```{r}
+fit2 <- ksmooth(data$X, data$Y, "normal", bandwidth = h)
+plot(data$X, data$Y)
+lines(grid_xy, col = "red")
+lines(fit2, col = "yellow")
+```
+Il est calire que celui denée par R est plus convenable avec celui créer par moi.
+essayons le  modele linaire:
+```{r}
+ML <- lm(Y ~ X, data = data)
+
+plot(data$X,data$Y,pch=20,cex=0.01,xlab="X",ylab="Y")
+abline(ML, col="blue")
+
+```
+
+On voit bien que la regression lineaire echape beaucoup de points du shema, alors que la regression non parametrique est convenable.
+
+L'estimateurde l'erreure quadratique s'ecrit sous la forme:
+$$
+\Re^2(\hat{r}(x)) = \frac{1}{n} \sum(\hat{r_{n,h}^{(-)}}(x)- Y_{i})^2 
+=\frac{1}{n}\sum(-\xi_{i})^2 = \frac{1}{n}\sum(\xi_{i})^2
+$$
+
+VALIDATION CROISée
+
+La validation croisée « cross-validation » est, en apprentissage automatique, une méthode d’estimation de fiabilité d’un modèle fondée sur une technique d’échantillonnage. Cette methode se base uniquement sur les données, on divise l'echantillon en 2 ensembles, un d'apprentissage "training set" et autre de validation "validation set", ensuite on fabrique des estimateurs à partir de training set et on utilise le validation set pour estimer le risque de prediction.
+ et donc h est la valeure qui minimise les estimateurs du risque de prediction.
+Dans notre projet:
+On coupe l’´echantillon en deux, tel que:
+   i ∈ J− = {1,....,2500} 
+   ou que i ∈ J+ ={2501, . . . , 5000}. 
+on pose:
+$$
+\xi_{i} = Y_{i} - \hat{r}_{n,h}^{(-)}(X_{i}) , i\in J_{+}
+$$
+avec l’estimateur construit a l’aide de  (Xi, Yi) i∈J est noté:
+$$
+\hat{r_{n,h}^{(-)}}
+$$
+
+donc le decoupement de jeu de donnée en deux partie J+ et J- est de appliquer la creuse validation pour obtenir un h minimal, donc le J- sera validation set et j+ sera training set puis on change les roles.
+
+
+
